@@ -1,6 +1,6 @@
 {
-    "name": "MHCockpit.VLPipe",
-    "rootNamespace": "MHCockpit.VLPipe.Runtime",
+    "name": "MHCockpit.VLPipe.Runtime",
+    "rootNamespace": "",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

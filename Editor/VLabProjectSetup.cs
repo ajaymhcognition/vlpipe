@@ -88,6 +88,7 @@ namespace MHCockpit.VLPipe.Editor
         public enum EduBoard { CBSE, ICSE, StateBoard }
         public enum Grade { Grade6, Grade7, Grade8, Grade9, Grade10, Grade11, Grade12 }
         public enum Subject { Physics, Chemistry, Biology, Mathematics }
+        public enum UnitType { Unit, Chapter }
 
         [Serializable]
         private class ModuleConfig
@@ -129,7 +130,8 @@ namespace MHCockpit.VLPipe.Editor
         private EduBoard _board = EduBoard.CBSE;
         private Grade _grade = Grade.Grade12;
         private Subject _subject = Subject.Physics;
-        private string _unit  = string.Empty;
+        private UnitType _unitType = UnitType.Unit;
+        private int _unitNumber = 1;
         private string _topic = string.Empty;
 
         // ── Step flags (7 steps) ──────────────────────────────────────────────
@@ -347,14 +349,18 @@ namespace MHCockpit.VLPipe.Editor
             _grade   = (Grade)  EditorGUILayout.EnumPopup("Grade",   _grade);
             _subject = (Subject)EditorGUILayout.EnumPopup("Subject", _subject);
 
-            _unit = EditorGUILayout.TextField(
-                new GUIContent("Unit / Chapter", "Enter the exact folder name — e.g. Unit2, Chapter5, or any custom value. Stored exactly as typed."),
-                _unit);
+            _unitType = (UnitType)EditorGUILayout.EnumPopup(
+                new GUIContent("Unit Type", "Select Unit or Chapter. Combined with the number below to create the folder name."),
+                _unitType);
+            _unitNumber = EditorGUILayout.IntField(
+                new GUIContent("Number", "e.g. 2 → Unit2 or Chapter2"),
+                _unitNumber);
+            if (_unitNumber < 1) _unitNumber = 1;
 
-            if (!string.IsNullOrWhiteSpace(_unit))
-                GUILayout.Label(
-                    $"Folder preview: …/{_grade}/{_subject}/\u200B{_unit}/{_topic}/",
-                    _styleSmall);
+            string unitFolder = $"{_unitType}{_unitNumber}";
+            GUILayout.Label(
+                $"Folder preview: …/{_grade}/{_subject}/{unitFolder}/{_topic}/",
+                _styleSmall);
 
             EditorGUI.BeginDisabledGroup(true);
             EditorGUILayout.TextField("Topic", _topic);
@@ -480,14 +486,16 @@ namespace MHCockpit.VLPipe.Editor
         //   "Practice.unity" and "Evaluation.unity" (or whatever they prefer).
         private void RunStep2()
         {
-            if (string.IsNullOrWhiteSpace(_unit))
-            { Log("Unit / Chapter is required. Enter the exact folder name, e.g. Unit2, Chapter5.", false); return; }
+            if (_unitNumber < 1)
+            { Log("Unit / Chapter number must be 1 or greater.", false); return; }
+
+            string unitFolder = $"{_unitType}{_unitNumber}";
 
             string root  = Path.Combine(Application.dataPath, "Modules");
             string board = Path.Combine(root,  _board.ToString());
             string grade = Path.Combine(board, _grade.ToString());   // e.g. "Grade12"
             string subj  = Path.Combine(grade, _subject.ToString());
-            string unit  = Path.Combine(subj,  _unit.Trim());        // e.g. "Unit2", "Chapter5", custom
+            string unit  = Path.Combine(subj,  unitFolder);           // e.g. "Unit2", "Chapter5"
             string topic = Path.Combine(unit,  _topic);
 
             if (Directory.Exists(topic))
@@ -508,7 +516,7 @@ namespace MHCockpit.VLPipe.Editor
                         board       = _board.ToString(),
                         grade       = _grade.ToString(),   // e.g. "Grade12" — stored as-is
                         subject     = _subject.ToString(),
-                        unit        = _unit.Trim(),         // e.g. "Unit2", "Chapter5", custom — stored as-is
+                        unit        = unitFolder,            // e.g. "Unit2", "Chapter5" — stored as-is
                         topic       = _topic,
                         createdDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                     }, true));

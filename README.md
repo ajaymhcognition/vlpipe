@@ -1,20 +1,20 @@
 # VLab Pipe — Unity Addressables Build & Upload Plugin
 
-**VLab Pipe** is a Unity Editor plugin that builds WebGL Addressables and uploads them directly to AWS S3 — with a single click, from inside Unity.
+VLab Pipe is a Unity Editor plugin that builds WebGL Addressables and uploads them directly to AWS S3 — single click, from inside Unity.
 
-Install it once via the Unity Package Manager. No command line. No manual setup. No credentials in code.
+Install once via Unity Package Manager. No command line. No manual S3 management. No credentials in code.
 
 ---
 
 ## Install
 
-In Unity, open **Window → Package Manager → + → Add package from git URL** and enter:
+**Window → Package Manager → + → Add package from git URL:**
 
 ```
 https://github.com/ajaymhcognition/vlpipe.git
 ```
 
-Unity will import the package automatically. All menu items appear under **Tools → Virtual Lab** once import is complete.
+All menu items appear under **Tools → Virtual Lab** once import completes.
 
 ---
 
@@ -28,9 +28,9 @@ Run these steps once per project, in order.
 Tools → Virtual Lab → AWS Settings
 ```
 
-Enter the **Access Key ID** and **Secret Access Key**, then click **Save Credentials**.
+Enter **Access Key ID** and **Secret Access Key**, then click **Save Credentials**.
 
-Credentials are stored on this machine only — never in the project folder, never in Git. Once saved, no one can see the values again. The window shows only a green confirmation to anyone who opens it after you.
+Credentials are stored in Unity `EditorPrefs` (Windows Registry / macOS plist) on this machine only — never in the project folder, never in Git. Once saved, the window shows only a green confirmation. No one can view the values after saving.
 
 ### Step 2 — Configure the Project
 
@@ -38,37 +38,32 @@ Credentials are stored on this machine only — never in the project folder, nev
 Tools → Virtual Lab → Project Setup
 ```
 
-A step-by-step wizard opens. Complete all 7 steps in order:
+A 7-step wizard opens. Complete all steps in order:
 
-| Step | What it does |
+| Step | What It Does |
 |------|--------------|
 | 1 | Installs the Addressables package |
-| 2 | Creates the module folder — fill in Board, Grade, Subject, Unit / Chapter, and Topic |
-| 3 | Creates Addressables Settings |
-| 4 | Configures build and load profiles |
-| 5 | Configures the Default Local Group for remote delivery |
-| 6 | Adds scenes to Addressables groups |
-| 7 | Saves and finishes |
+| 2 | Creates the module folder structure — Board, Grade, Subject, Unit Type + Number, and Topic |
+| 3 | Creates Addressables Settings asset |
+| 4 | Configures build and load profiles for remote delivery |
+| 5 | Configures the Default Local Group with remote paths, LZ4, CRC, Append Hash |
+| 6 | Adds Practice and Evaluation scenes to Addressables |
+| 7 | Saves all assets and finalises |
 
-#### Step 2 — Unit / Chapter Field
+#### Step 2 — Unit Type and Number
 
-The Unit / Chapter field accepts any string and stores it **exactly as typed** — no automatic shortening or normalisation is applied.
+The wizard provides a **Unit Type** dropdown (`Unit` or `Chapter`) and a **Number** field. These combine to produce the S3 folder name:
 
-| What you type | Folder created | LMS must send |
-|---------------|----------------|---------------|
-| `Unit2` | `…/Unit2/…` | `&unit=Unit2` |
-| `Chapter5` | `…/Chapter5/…` | `&unit=Chapter5` |
-| `Semester1` | `…/Semester1/…` | `&unit=Semester1` |
-| `MyCustomValue` | `…/MyCustomValue/…` | `&unit=MyCustomValue` |
+| Unit Type | Number | Folder Created | LMS Must Send |
+|-----------|--------|----------------|---------------|
+| `Unit` | `2` | `…/Unit2/…` | `&unit=Unit2` |
+| `Chapter` | `5` | `…/Chapter5/…` | `&unit=Chapter5` |
+| `Unit` | `1` | `…/Unit1/…` | `&unit=Unit1` |
+| `Chapter` | `3` | `…/Chapter3/…` | `&unit=Chapter3` |
 
-The same rule applies to Grade — the dropdown stores the full enum name:
+The combined value is written into `module_config.json` and used as the S3 upload prefix. The LMS URL must send the exact same string in the `unit` parameter.
 
-| Dropdown selection | Folder created | LMS must send |
-|--------------------|----------------|---------------|
-| Grade12 | `…/Grade12/…` | `&grade=Grade12` |
-| Grade10 | `…/Grade10/…` | `&grade=Grade10` |
-
-> **The LMS URL must send the exact same strings that were entered during Project Setup.** The Virtual Lab Dashboard passes them through to S3 without any modification.
+The same rule applies to Grade — the dropdown stores the full enum name (`Grade12`, not `12`).
 
 ---
 
@@ -78,23 +73,23 @@ The same rule applies to Grade — the dropdown stores the full enum name:
 Tools → Virtual Lab → Pipeline → Build And Upload To S3
 ```
 
-The pipeline runs in this order:
+The pipeline runs four steps automatically:
 
 ```
-1. Clean     — deletes stale ServerData, clears Addressables cache
+1. Clean     — deletes stale ServerData folder, clears Addressables content cache
 2. Platform  — confirms or switches to WebGL
-3. Build     — compiles Addressables, generates remote catalog (JSON)
-4. Upload    — pushes all files to S3
+3. Build     — compiles Addressables, generates remote JSON catalog
+4. Upload    — pushes all output files to S3
 ```
 
-A progress bar shows every step. A dialog confirms when the upload is complete.
+A progress bar shows every step. A dialog confirms when the upload completes.
 
 ---
 
 ## Tools at a Glance
 
-| Menu item | Who uses it | When |
-|-----------|-------------|------|
+| Menu Item | Who | When |
+|-----------|-----|------|
 | `Tools → Virtual Lab → AWS Settings` | Senior developer | Once per machine |
 | `Tools → Virtual Lab → Project Setup` | Any developer | Once per new project |
 | `Tools → Virtual Lab → Pipeline → Build And Upload To S3` | Any developer | Every publish |
@@ -102,47 +97,54 @@ A progress bar shows every step. A dialog confirms when the upload is complete.
 
 ---
 
-## AWS Credentials — How It Works
+## AWS Credentials — Security Model
 
-Credentials are **never stored in any file inside the project**. They are saved in Unity's `EditorPrefs` (Windows Registry or macOS plist).
+Credentials never appear in any project file. Storage locations:
 
-| Who opens AWS Settings | What they see |
+| Source | Used By |
+|--------|---------|
+| `EditorPrefs` (local machine) | Interactive Unity Editor — set via AWS Settings window |
+| Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) | GitHub Actions CI/CD |
+
+If credentials are missing when Build And Upload runs, Unity shows a dialog and opens the AWS Settings window automatically.
+
+| Who Opens AWS Settings | What They See |
 |------------------------|---------------|
 | Senior (first time) | Entry form — paste keys and save |
-| Junior (any time after) | Green status only — no fields, no values |
+| Junior (any time after) | Green status only — no fields, no values visible |
 | Senior (needs to update) | Clicks **Update Credentials** → confirms → enters new keys |
-
-If credentials are missing when a build is triggered, Unity shows a dialog and opens the AWS Settings window automatically.
 
 ---
 
 ## S3 Upload Path
 
-Files are uploaded under this structure:
+Files are uploaded to:
 
 ```
 s3://<bucket>/Modules/<Board>/<Grade>/<Subject>/<Unit>/<Topic>/<BuildTarget>/
 ```
 
-Example:
+Examples:
 
 ```
-s3://your-bucket/Modules/CBSE/Grade12/Physics/Unit2/Optics/WebGL/
+s3://mhc-embibe-test/Modules/CBSE/Grade11/Physics/Unit2/DeterminingMassOfABodyUsingMeterScale/WebGL/
   catalog_mhcockpit.json
-  optics_bundle.bundle
+  *.bundle
+  *.hash
+
+s3://mhc-embibe-test/Modules/CBSE/Grade12/Physics/Chapter5/Optics/WebGL/
+  catalog_mhcockpit.json
+  *.bundle
+  *.hash
 ```
 
-### Path Segment Rules
-
-Every segment is stored and uploaded **exactly as entered** — no shortening or reformatting.
-
-| Segment | Source | Example |
-|---------|--------|---------|
-| Board | Board dropdown | `CBSE` |
-| Grade | Grade dropdown (full enum name) | `Grade12` |
-| Subject | Subject dropdown | `Physics` |
-| Unit / Chapter | Free-text — stored as typed | `Unit2`, `Chapter5`, `Semester1` |
-| Topic | Auto-filled from project name (PascalCase) | `Optics` |
+| Segment | Source | Examples |
+|---------|--------|----------|
+| Board | Board dropdown | `CBSE`, `ICSE`, `StateBoard` |
+| Grade | Grade dropdown (full enum name) | `Grade12`, `Grade11` |
+| Subject | Subject dropdown | `Physics`, `Chemistry` |
+| Unit | UnitType dropdown + Number field | `Unit2`, `Chapter5` |
+| Topic | Auto-filled from project name (PascalCase) | `Optics`, `DeterminingMassOfABodyUsingMeterScale` |
 | BuildTarget | Addressables build setting | `WebGL` |
 
 ---
@@ -151,16 +153,13 @@ Every segment is stored and uploaded **exactly as entered** — no shortening or
 
 - Unity 2022.3 LTS or newer (Unity 6 supported)
 - WebGL Build Support installed via Unity Hub
-- Unity Addressables package (the setup wizard installs this for you)
-- An AWS S3 bucket with write access
+- Unity Addressables package (the wizard installs this at Step 1)
+- AWS S3 bucket with write access
 
 ---
 
 ## .gitignore
 
-Add this to your `.gitignore` to keep build output out of the repository:
-
 ```gitignore
-# Addressables remote build output — rebuilt on every run
 ServerData/
 ```

@@ -266,8 +266,7 @@ namespace MHCockpit.VLPipe.Editor
             }
 
             Debug.Log($"[VLab S3] Module: {config.board} / {config.grade} / " +
-                      $"{config.subject} / {config.unit} / {config.topic}" +
-                      $"  →  s3 prefix will use: {config.board}/{config.grade}/{config.subject}/{config.unit}/…");
+                      $"{config.subject} / {config.unit} / {config.topic}");
             return config;
         }
 

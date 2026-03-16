@@ -348,14 +348,12 @@ namespace MHCockpit.VLPipe.Editor
             _subject = (Subject)EditorGUILayout.EnumPopup("Subject", _subject);
 
             _unit = EditorGUILayout.TextField(
-                new GUIContent("Unit Number", "Enter a number, e.g. 3  →  stored as U3"),
+                new GUIContent("Unit / Chapter", "Enter the exact folder name — e.g. Unit2, Chapter5, or any custom value. Stored exactly as typed."),
                 _unit);
 
-            string unitPreview = NormalizeUnit(_unit);
-            string gradePreview = GradeToFolder(_grade);
-            if (!string.IsNullOrWhiteSpace(unitPreview))
+            if (!string.IsNullOrWhiteSpace(_unit))
                 GUILayout.Label(
-                    $"Folder preview: …/{gradePreview}/{_subject}/\u200B{unitPreview}/{_topic}/",
+                    $"Folder preview: …/{_grade}/{_subject}/\u200B{_unit}/{_topic}/",
                     _styleSmall);
 
             EditorGUI.BeginDisabledGroup(true);
@@ -482,15 +480,14 @@ namespace MHCockpit.VLPipe.Editor
         //   "Practice.unity" and "Evaluation.unity" (or whatever they prefer).
         private void RunStep2()
         {
-            string unitFolder  = NormalizeUnit(_unit);
-            if (string.IsNullOrWhiteSpace(unitFolder))
-            { Log("Unit Number is required. Enter a number, e.g. 3.", false); return; }
+            if (string.IsNullOrWhiteSpace(_unit))
+            { Log("Unit / Chapter is required. Enter the exact folder name, e.g. Unit2, Chapter5.", false); return; }
 
             string root  = Path.Combine(Application.dataPath, "Modules");
             string board = Path.Combine(root,  _board.ToString());
-            string grade = Path.Combine(board, GradeToFolder(_grade));
+            string grade = Path.Combine(board, _grade.ToString());   // e.g. "Grade12"
             string subj  = Path.Combine(grade, _subject.ToString());
-            string unit  = Path.Combine(subj,  unitFolder);
+            string unit  = Path.Combine(subj,  _unit.Trim());        // e.g. "Unit2", "Chapter5", custom
             string topic = Path.Combine(unit,  _topic);
 
             if (Directory.Exists(topic))
@@ -509,9 +506,9 @@ namespace MHCockpit.VLPipe.Editor
                     JsonUtility.ToJson(new ModuleConfig
                     {
                         board       = _board.ToString(),
-                        grade       = GradeToFolder(_grade),   // e.g. "G12"
+                        grade       = _grade.ToString(),   // e.g. "Grade12" — stored as-is
                         subject     = _subject.ToString(),
-                        unit        = unitFolder,               // e.g. "U3"
+                        unit        = _unit.Trim(),         // e.g. "Unit2", "Chapter5", custom — stored as-is
                         topic       = _topic,
                         createdDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                     }, true));
@@ -1082,42 +1079,7 @@ namespace MHCockpit.VLPipe.Editor
 #endif
 
         /// <summary>
-        /// Converts a Grade enum value to a compact folder name.
-        /// Grade12 → "G12",  Grade6 → "G6", etc.
-        /// </summary>
-        internal static string GradeToFolder(Grade grade) =>
-            "G" + grade.ToString().Replace("Grade", "");
-
-        /// <summary>
-        /// Normalises any unit input to the compact "U{n}" form.
-        /// Accepts:  "3"  →  "U3"
-        ///           "U3" →  "U3"
-        ///           "Unit3" / "unit3"  →  "U3"
-        /// Returns the original (trimmed) string unchanged if it contains no digits,
-        /// allowing free-form unit names while still normalising the common cases.
-        /// </summary>
-        internal static string NormalizeUnit(string input)
-        {
-            if (string.IsNullOrWhiteSpace(input)) return string.Empty;
-            input = input.Trim();
-
-            // Strip leading "Unit" or "U" prefix (case-insensitive) to get the bare token.
-            string token = input;
-            if (token.StartsWith("Unit", StringComparison.OrdinalIgnoreCase))
-                token = token.Substring(4).Trim();
-            else if (token.Length > 1 &&
-                     (token[0] == 'U' || token[0] == 'u') &&
-                     char.IsDigit(token[1]))
-                token = token.Substring(1).Trim();
-
-            // If the remaining token is purely numeric, emit "U{n}".
-            // Otherwise return the original input as-is (e.g. "Alpha", "I", "II").
-            return token.Length > 0 && token.All(char.IsDigit)
-                ? "U" + token
-                : input;
-        }
-
-
+        /// Converts a raw topic string to a PascalCase key.
         /// Retained for use by BuildAndUploadToS3 when constructing S3 paths.
         /// </summary>
         internal static string ToAddressableKey(string sceneName)

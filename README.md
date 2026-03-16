@@ -30,7 +30,7 @@ Tools → Virtual Lab → AWS Settings
 
 Enter the **Access Key ID** and **Secret Access Key**, then click **Save Credentials**.
 
-That's it. Credentials are stored on this machine only — never in the project folder, never in Git. Once saved, no one can see the values again. The window shows only a green confirmation to anyone who opens it after you.
+Credentials are stored on this machine only — never in the project folder, never in Git. Once saved, no one can see the values again. The window shows only a green confirmation to anyone who opens it after you.
 
 ### Step 2 — Configure the Project
 
@@ -43,24 +43,32 @@ A step-by-step wizard opens. Complete all 7 steps in order:
 | Step | What it does |
 |------|--------------|
 | 1 | Installs the Addressables package |
-| 2 | Creates the module folder — fill in Board, Grade, Subject, **Unit Number**, and Topic |
+| 2 | Creates the module folder — fill in Board, Grade, Subject, Unit / Chapter, and Topic |
 | 3 | Creates Addressables Settings |
 | 4 | Configures build and load profiles |
 | 5 | Configures the Default Local Group for remote delivery |
 | 6 | Adds scenes to Addressables groups |
 | 7 | Saves and finishes |
 
-#### Step 2 Field Reference
+#### Step 2 — Unit / Chapter Field
 
-| Field | Input | Folder name |
-|-------|-------|-------------|
-| Board | `CBSE` | `CBSE` |
-| Grade | dropdown (e.g. Grade12) | `G12` |
-| Subject | dropdown (e.g. Physics) | `Physics` |
-| Unit Number | `3` or `U3` or `Unit3` | `U3` |
-| Topic | auto-filled from project name | `Algebra` |
+The Unit / Chapter field accepts any string and stores it **exactly as typed** — no automatic shortening or normalisation is applied.
 
-> **Grade and Unit are automatically compacted** — you never type `Grade12` or `Unit3` manually. Enter just the number (e.g. `3`) and the wizard writes `U3`.
+| What you type | Folder created | LMS must send |
+|---------------|----------------|---------------|
+| `Unit2` | `…/Unit2/…` | `&unit=Unit2` |
+| `Chapter5` | `…/Chapter5/…` | `&unit=Chapter5` |
+| `Semester1` | `…/Semester1/…` | `&unit=Semester1` |
+| `MyCustomValue` | `…/MyCustomValue/…` | `&unit=MyCustomValue` |
+
+The same rule applies to Grade — the dropdown stores the full enum name:
+
+| Dropdown selection | Folder created | LMS must send |
+|--------------------|----------------|---------------|
+| Grade12 | `…/Grade12/…` | `&grade=Grade12` |
+| Grade10 | `…/Grade10/…` | `&grade=Grade10` |
+
+> **The LMS URL must send the exact same strings that were entered during Project Setup.** The Virtual Lab Dashboard passes them through to S3 without any modification.
 
 ---
 
@@ -70,13 +78,13 @@ A step-by-step wizard opens. Complete all 7 steps in order:
 Tools → Virtual Lab → Pipeline → Build And Upload To S3
 ```
 
-The pipeline runs automatically in this order:
+The pipeline runs in this order:
 
 ```
-1. Clean        — deletes stale ServerData, clears Addressables cache
-2. Platform     — confirms or switches to WebGL
-3. Build        — compiles Addressables, generates remote catalog (JSON)
-4. Upload       — pushes all files to S3
+1. Clean     — deletes stale ServerData, clears Addressables cache
+2. Platform  — confirms or switches to WebGL
+3. Build     — compiles Addressables, generates remote catalog (JSON)
+4. Upload    — pushes all files to S3
 ```
 
 A progress bar shows every step. A dialog confirms when the upload is complete.
@@ -87,21 +95,21 @@ A progress bar shows every step. A dialog confirms when the upload is complete.
 
 | Menu item | Who uses it | When |
 |-----------|-------------|------|
-| `Tools → Virtual Lab → AWS Settings` | Senior developer | Once per machine, to enter credentials |
+| `Tools → Virtual Lab → AWS Settings` | Senior developer | Once per machine |
 | `Tools → Virtual Lab → Project Setup` | Any developer | Once per new project |
-| `Tools → Virtual Lab → Pipeline → Build And Upload To S3` | Any developer | Every time you want to publish |
-| `Tools → Virtual Lab → Pipeline → Clean Build Cache` | Any developer | If you need a manual clean |
+| `Tools → Virtual Lab → Pipeline → Build And Upload To S3` | Any developer | Every publish |
+| `Tools → Virtual Lab → Pipeline → Clean Build Cache` | Any developer | Manual clean if needed |
 
 ---
 
 ## AWS Credentials — How It Works
 
-Credentials are **never stored in any file inside the project**. They are saved in Unity's `EditorPrefs`, which is part of the operating system user profile on each machine (Windows Registry or macOS plist).
+Credentials are **never stored in any file inside the project**. They are saved in Unity's `EditorPrefs` (Windows Registry or macOS plist).
 
 | Who opens AWS Settings | What they see |
 |------------------------|---------------|
 | Senior (first time) | Entry form — paste keys and save |
-| Junior (any time after) | Green status: *"Credentials are saved on this system"* — no fields, no values |
+| Junior (any time after) | Green status only — no fields, no values |
 | Senior (needs to update) | Clicks **Update Credentials** → confirms → enters new keys |
 
 If credentials are missing when a build is triggered, Unity shows a dialog and opens the AWS Settings window automatically.
@@ -110,7 +118,7 @@ If credentials are missing when a build is triggered, Unity shows a dialog and o
 
 ## S3 Upload Path
 
-Files are uploaded under this compact structure:
+Files are uploaded under this structure:
 
 ```
 s3://<bucket>/Modules/<Board>/<Grade>/<Subject>/<Unit>/<Topic>/<BuildTarget>/
@@ -119,23 +127,23 @@ s3://<bucket>/Modules/<Board>/<Grade>/<Subject>/<Unit>/<Topic>/<BuildTarget>/
 Example:
 
 ```
-s3://your-bucket/Modules/CBSE/G12/Physics/U3/Optics/WebGL/
+s3://your-bucket/Modules/CBSE/Grade12/Physics/Unit2/Optics/WebGL/
   catalog_mhcockpit.json
   optics_bundle.bundle
 ```
 
 ### Path Segment Rules
 
-| Segment | Source | Format | Example |
-|---------|--------|--------|---------|
-| Board | Board dropdown | As-is | `CBSE` |
-| Grade | Grade dropdown | `G` + number | `G12` |
-| Subject | Subject dropdown | As-is | `Physics` |
-| Unit | Unit Number field | `U` + number | `U3` |
-| Topic | Project name (PascalCase) | As-is | `Optics` |
-| BuildTarget | BootstrapConfig | As-is | `WebGL` |
+Every segment is stored and uploaded **exactly as entered** — no shortening or reformatting.
 
-> The Grade and Unit compaction is automatic — `Grade12` becomes `G12`, any input of `3`, `U3`, or `Unit3` all become `U3`.
+| Segment | Source | Example |
+|---------|--------|---------|
+| Board | Board dropdown | `CBSE` |
+| Grade | Grade dropdown (full enum name) | `Grade12` |
+| Subject | Subject dropdown | `Physics` |
+| Unit / Chapter | Free-text — stored as typed | `Unit2`, `Chapter5`, `Semester1` |
+| Topic | Auto-filled from project name (PascalCase) | `Optics` |
+| BuildTarget | Addressables build setting | `WebGL` |
 
 ---
 
@@ -150,7 +158,7 @@ s3://your-bucket/Modules/CBSE/G12/Physics/U3/Optics/WebGL/
 
 ## .gitignore
 
-Add this to your project's `.gitignore` to keep build output out of the repository:
+Add this to your `.gitignore` to keep build output out of the repository:
 
 ```gitignore
 # Addressables remote build output — rebuilt on every run

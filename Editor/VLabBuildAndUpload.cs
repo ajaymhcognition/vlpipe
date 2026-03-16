@@ -223,7 +223,7 @@ namespace MHCockpit.VLPipe.Editor
         [Serializable]
         private class ModuleConfig
         {
-            public string board, grade, subject, topic, createdDate;
+            public string board, grade, subject, unit, topic, createdDate;
         }
 
         private static ModuleConfig ReadModuleConfig()
@@ -257,6 +257,7 @@ namespace MHCockpit.VLPipe.Editor
                 || string.IsNullOrEmpty(config.board)
                 || string.IsNullOrEmpty(config.grade)
                 || string.IsNullOrEmpty(config.subject)
+                || string.IsNullOrEmpty(config.unit)
                 || string.IsNullOrEmpty(config.topic))
             {
                 Debug.LogError("[VLab S3] module_config.json is corrupt. " +
@@ -265,7 +266,8 @@ namespace MHCockpit.VLPipe.Editor
             }
 
             Debug.Log($"[VLab S3] Module: {config.board} / {config.grade} / " +
-                      $"{config.subject} / {config.topic}");
+                      $"{config.subject} / {config.unit} / {config.topic}" +
+                      $"  →  s3 prefix will use: {config.board}/{config.grade}/{config.subject}/{config.unit}/…");
             return config;
         }
 
@@ -447,7 +449,7 @@ namespace MHCockpit.VLPipe.Editor
         // ═════════════════════════════════════════════════════════════════════
 
         private static string BuildS3Prefix(ModuleConfig cfg, string buildTarget) =>
-            $"Modules/{cfg.board}/{cfg.grade}/{cfg.subject}/{VLabProjectSetup.ToAddressableKey(cfg.topic)}/{buildTarget}/";
+            $"Modules/{cfg.board}/{cfg.grade}/{cfg.subject}/{cfg.unit}/{VLabProjectSetup.ToAddressableKey(cfg.topic)}/{buildTarget}/";
 
         private static async Task UploadFolderAsync(string localFolder, string s3Prefix)
         {

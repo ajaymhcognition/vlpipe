@@ -92,7 +92,7 @@ namespace MHCockpit.VLPipe.Editor
         [Serializable]
         private class ModuleConfig
         {
-            public string board, grade, subject, topic, createdDate;
+            public string board, grade, subject, unit, topic, createdDate;
         }
 
         // ── Constants ─────────────────────────────────────────────────────────
@@ -129,6 +129,7 @@ namespace MHCockpit.VLPipe.Editor
         private EduBoard _board = EduBoard.CBSE;
         private Grade _grade = Grade.Grade12;
         private Subject _subject = Subject.Physics;
+        private string _unit  = string.Empty;
         private string _topic = string.Empty;
 
         // ── Step flags (7 steps) ──────────────────────────────────────────────
@@ -342,9 +343,21 @@ namespace MHCockpit.VLPipe.Editor
 
         private void DrawStep2Body()
         {
-            _board = (EduBoard)EditorGUILayout.EnumPopup("Board", _board);
-            _grade = (Grade)EditorGUILayout.EnumPopup("Grade", _grade);
+            _board   = (EduBoard)EditorGUILayout.EnumPopup("Board",   _board);
+            _grade   = (Grade)  EditorGUILayout.EnumPopup("Grade",   _grade);
             _subject = (Subject)EditorGUILayout.EnumPopup("Subject", _subject);
+
+            _unit = EditorGUILayout.TextField(
+                new GUIContent("Unit Number", "Enter a number, e.g. 3  →  stored as U3"),
+                _unit);
+
+            string unitPreview = NormalizeUnit(_unit);
+            string gradePreview = GradeToFolder(_grade);
+            if (!string.IsNullOrWhiteSpace(unitPreview))
+                GUILayout.Label(
+                    $"Folder preview: …/{gradePreview}/{_subject}/\u200B{unitPreview}/{_topic}/",
+                    _styleSmall);
+
             EditorGUI.BeginDisabledGroup(true);
             EditorGUILayout.TextField("Topic", _topic);
             EditorGUI.EndDisabledGroup();
@@ -469,11 +482,16 @@ namespace MHCockpit.VLPipe.Editor
         //   "Practice.unity" and "Evaluation.unity" (or whatever they prefer).
         private void RunStep2()
         {
-            string root = Path.Combine(Application.dataPath, "Modules");
-            string board = Path.Combine(root, _board.ToString());
-            string grade = Path.Combine(board, _grade.ToString());
-            string subj = Path.Combine(grade, _subject.ToString());
-            string topic = Path.Combine(subj, _topic);
+            string unitFolder  = NormalizeUnit(_unit);
+            if (string.IsNullOrWhiteSpace(unitFolder))
+            { Log("Unit Number is required. Enter a number, e.g. 3.", false); return; }
+
+            string root  = Path.Combine(Application.dataPath, "Modules");
+            string board = Path.Combine(root,  _board.ToString());
+            string grade = Path.Combine(board, GradeToFolder(_grade));
+            string subj  = Path.Combine(grade, _subject.ToString());
+            string unit  = Path.Combine(subj,  unitFolder);
+            string topic = Path.Combine(unit,  _topic);
 
             if (Directory.Exists(topic))
             { _s2 = true; Log("Module folder already exists — continuing. ✓", true); return; }
@@ -482,7 +500,7 @@ namespace MHCockpit.VLPipe.Editor
             {
                 foreach (string d in new[]
                 {
-                    root, board, grade, subj, topic,
+                    root, board, grade, subj, unit, topic,
                     Path.Combine(topic, "Scripts"),
                     Path.Combine(topic, "Scenes")
                 }) Directory.CreateDirectory(d);
@@ -490,10 +508,11 @@ namespace MHCockpit.VLPipe.Editor
                 File.WriteAllText(Path.Combine(topic, "module_config.json"),
                     JsonUtility.ToJson(new ModuleConfig
                     {
-                        board = _board.ToString(),
-                        grade = _grade.ToString(),
-                        subject = _subject.ToString(),
-                        topic = _topic,
+                        board       = _board.ToString(),
+                        grade       = GradeToFolder(_grade),   // e.g. "G12"
+                        subject     = _subject.ToString(),
+                        unit        = unitFolder,               // e.g. "U3"
+                        topic       = _topic,
                         createdDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                     }, true));
 
@@ -1063,7 +1082,42 @@ namespace MHCockpit.VLPipe.Editor
 #endif
 
         /// <summary>
-        /// Converts a raw topic string to a PascalCase key.
+        /// Converts a Grade enum value to a compact folder name.
+        /// Grade12 → "G12",  Grade6 → "G6", etc.
+        /// </summary>
+        internal static string GradeToFolder(Grade grade) =>
+            "G" + grade.ToString().Replace("Grade", "");
+
+        /// <summary>
+        /// Normalises any unit input to the compact "U{n}" form.
+        /// Accepts:  "3"  →  "U3"
+        ///           "U3" →  "U3"
+        ///           "Unit3" / "unit3"  →  "U3"
+        /// Returns the original (trimmed) string unchanged if it contains no digits,
+        /// allowing free-form unit names while still normalising the common cases.
+        /// </summary>
+        internal static string NormalizeUnit(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+            input = input.Trim();
+
+            // Strip leading "Unit" or "U" prefix (case-insensitive) to get the bare token.
+            string token = input;
+            if (token.StartsWith("Unit", StringComparison.OrdinalIgnoreCase))
+                token = token.Substring(4).Trim();
+            else if (token.Length > 1 &&
+                     (token[0] == 'U' || token[0] == 'u') &&
+                     char.IsDigit(token[1]))
+                token = token.Substring(1).Trim();
+
+            // If the remaining token is purely numeric, emit "U{n}".
+            // Otherwise return the original input as-is (e.g. "Alpha", "I", "II").
+            return token.Length > 0 && token.All(char.IsDigit)
+                ? "U" + token
+                : input;
+        }
+
+
         /// Retained for use by BuildAndUploadToS3 when constructing S3 paths.
         /// </summary>
         internal static string ToAddressableKey(string sceneName)

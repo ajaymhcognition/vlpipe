@@ -43,12 +43,24 @@ A step-by-step wizard opens. Complete all 7 steps in order:
 | Step | What it does |
 |------|--------------|
 | 1 | Installs the Addressables package |
-| 2 | Creates the module folder and fills in board, grade, subject, topic |
+| 2 | Creates the module folder — fill in Board, Grade, Subject, **Unit Number**, and Topic |
 | 3 | Creates Addressables Settings |
 | 4 | Configures build and load profiles |
 | 5 | Configures the Default Local Group for remote delivery |
 | 6 | Adds scenes to Addressables groups |
 | 7 | Saves and finishes |
+
+#### Step 2 Field Reference
+
+| Field | Input | Folder name |
+|-------|-------|-------------|
+| Board | `CBSE` | `CBSE` |
+| Grade | dropdown (e.g. Grade12) | `G12` |
+| Subject | dropdown (e.g. Physics) | `Physics` |
+| Unit Number | `3` or `U3` or `Unit3` | `U3` |
+| Topic | auto-filled from project name | `Algebra` |
+
+> **Grade and Unit are automatically compacted** — you never type `Grade12` or `Unit3` manually. Enter just the number (e.g. `3`) and the wizard writes `U3`.
 
 ---
 
@@ -98,19 +110,32 @@ If credentials are missing when a build is triggered, Unity shows a dialog and o
 
 ## S3 Upload Path
 
-Files are uploaded under this structure:
+Files are uploaded under this compact structure:
 
 ```
-s3://<bucket>/Modules/<Board>/<Grade>/<Subject>/<Topic>/<BuildTarget>/
+s3://<bucket>/Modules/<Board>/<Grade>/<Subject>/<Unit>/<Topic>/<BuildTarget>/
 ```
 
 Example:
 
 ```
-s3://your-bucket/Modules/CBSE/Grade12/Physics/optics/WebGL/
-  catalog_abc123.json
+s3://your-bucket/Modules/CBSE/G12/Physics/U3/Optics/WebGL/
+  catalog_mhcockpit.json
   optics_bundle.bundle
 ```
+
+### Path Segment Rules
+
+| Segment | Source | Format | Example |
+|---------|--------|--------|---------|
+| Board | Board dropdown | As-is | `CBSE` |
+| Grade | Grade dropdown | `G` + number | `G12` |
+| Subject | Subject dropdown | As-is | `Physics` |
+| Unit | Unit Number field | `U` + number | `U3` |
+| Topic | Project name (PascalCase) | As-is | `Optics` |
+| BuildTarget | BootstrapConfig | As-is | `WebGL` |
+
+> The Grade and Unit compaction is automatic — `Grade12` becomes `G12`, any input of `3`, `U3`, or `Unit3` all become `U3`.
 
 ---
 
